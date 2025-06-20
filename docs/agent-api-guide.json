@@ -1,0 +1,155 @@
+{
+  "eion_agent_api_guide": {
+    "description": "Session-level API operations for AI agents. No authentication required - only agent_id validation.",
+    "base_url": "http://localhost:8080",
+    "authentication": "none",
+    "required_parameters": {
+      "agent_id": "Your agent identifier (required for all requests)",
+      "user_id": "User identifier for session context (required for session operations)"
+    },
+    "session_operations": {
+      "get_memories": {
+        "method": "GET",
+        "endpoint": "/sessions/v1/{session_id}/memories",
+        "parameters": {
+          "agent_id": "string (required)",
+          "last_n": "integer (optional, default: 10)",
+          "min_rating": "float (optional)"
+        },
+        "description": "Retrieve recent memories for a session",
+        "example": "GET /sessions/v1/session_123/memories?agent_id=agent_001&last_n=5"
+      },
+      "add_memory": {
+        "method": "POST",
+        "endpoint": "/sessions/v1/{session_id}/memories",
+        "parameters": {
+          "agent_id": "string (required)"
+        },
+        "body": {
+          "messages": [
+            {
+              "role": "string (user/assistant/system)",
+              "role_type": "string (user/assistant)",
+              "content": "string (required)"
+            }
+          ],
+          "metadata": "object (optional)"
+        },
+        "description": "Add new memory to session",
+        "example": "POST /sessions/v1/session_123/memories?agent_id=agent_001"
+      },
+      "search_memories": {
+        "method": "GET",
+        "endpoint": "/sessions/v1/{session_id}/memories/search",
+        "parameters": {
+          "agent_id": "string (required)",
+          "q": "string (search query, required)",
+          "limit": "integer (optional, default: 20)",
+          "min_score": "float (optional, default: 0.7)"
+        },
+        "description": "Search memories using semantic similarity",
+        "example": "GET /sessions/v1/session_123/memories/search?agent_id=agent_001&q=user%20preferences"
+      }
+    },
+    "knowledge_operations": {
+      "search_knowledge": {
+        "method": "GET",
+        "endpoint": "/sessions/v1/{session_id}/knowledge",
+        "parameters": {
+          "agent_id": "string (required)",
+          "user_id": "string (required)",
+          "query": "string (search query, required)",
+          "limit": "integer (optional, default: 20)"
+        },
+        "description": "Search knowledge in session context",
+        "example": "GET /sessions/v1/session_123/knowledge?agent_id=agent_001&user_id=user_123&query=user%20authentication"
+      },
+      "add_knowledge": {
+        "method": "POST",
+        "endpoint": "/sessions/v1/{session_id}/knowledge",
+        "parameters": {
+          "agent_id": "string (required)",
+          "user_id": "string (required)"
+        },
+        "body": {
+          "messages": [
+            {
+              "role": "string",
+              "role_type": "string (user/assistant)",
+              "content": "string (required)"
+            }
+          ]
+        },
+        "description": "Add knowledge to session with automatic conflict resolution",
+        "example": "POST /sessions/v1/session_123/knowledge?agent_id=agent_001&user_id=user_123"
+      },
+      "update_knowledge": {
+        "method": "PUT",
+        "endpoint": "/sessions/v1/{session_id}/knowledge",
+        "parameters": {
+          "agent_id": "string (required)",
+          "user_id": "string (required)"
+        },
+        "body": {
+          "messages": [
+            {
+              "role": "string",
+              "role_type": "string (user/assistant)",
+              "content": "string (required)"
+            }
+          ]
+        },
+        "description": "Update knowledge in session with automatic conflict resolution",
+        "example": "PUT /sessions/v1/session_123/knowledge?agent_id=agent_001&user_id=user_123"
+      },
+      "delete_knowledge": {
+        "method": "DELETE",
+        "endpoint": "/sessions/v1/{session_id}/knowledge",
+        "parameters": {
+          "agent_id": "string (required)",
+          "user_id": "string (required)"
+        },
+        "description": "Delete all knowledge for a session",
+        "example": "DELETE /sessions/v1/session_123/knowledge?agent_id=agent_001&user_id=user_123"
+      }
+    },
+    "response_formats": {
+      "success": {
+        "status_codes": [200, 201],
+        "example": {
+          "session_id": "session_123",
+          "messages": "array of message objects",
+          "facts": "array of fact objects",
+          "total_count": 42
+        }
+      },
+      "error": {
+        "status_codes": [400, 403, 404, 500],
+        "example": {
+          "error": "agent_id and user_id are required",
+          "scope": "session_only",
+          "hint": "Add ?agent_id=YOUR_AGENT&user_id=YOUR_USER to the URL"
+        }
+      }
+    },
+    "common_patterns": {
+      "agent_workflow": [
+        "1. Use search_knowledge() to retrieve relevant context",
+        "2. Process user input with retrieved context",
+        "3. Use add_knowledge() to store new insights",
+        "4. Use add_memory() to record the interaction"
+      ],
+      "error_handling": [
+        "Check for 403 errors - agent may not be registered",
+        "Check for 400 errors - missing required parameters",
+        "All operations require valid agent_id parameter"
+      ]
+    },
+    "limits": {
+      "max_messages_per_request": 50,
+      "max_message_length": 10000,
+      "max_search_results": 100,
+      "request_timeout": 30
+    }
+  }
+} 

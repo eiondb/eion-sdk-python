@@ -1,0 +1,571 @@
+openapi: 3.0.3
+info:
+  title: Eion API
+  description: |
+    Eion API provides shared memory storage and collaborative intelligence for AI agent systems.
+    
+    ## Authentication
+    
+    ### Cluster Operations
+    Cluster operations require developer authentication via API key:
+    ```
+    Authorization: Bearer your_cluster_api_key
+    ```
+    
+    ### Session Operations  
+    Session operations require agent_id parameter but no authentication headers.
+    
+  version: 0.1.0
+  license:
+    name: AGPL-3.0
+    url: https://www.gnu.org/licenses/agpl-3.0
+  contact:
+    name: Eion Team
+    url: https://eion.ai
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  # Health Check
+  /health:
+    get:
+      summary: Health check
+      description: Check server health status
+      tags: [Health]
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: healthy
+                      memory:
+                        type: string
+                        example: healthy
+
+  # Cluster Operations (Developer SDK)
+  /cluster/v1/users:
+    post:
+      summary: Create user
+      description: Create a new user in the system
+      tags: [Cluster - Users]
+      security:
+        - ClusterAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  description: Unique user identifier
+                name:
+                  type: string
+                  description: User's display name
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+        '401':
+          description: Authentication required
+        '409':
+          description: User already exists
+
+  /cluster/v1/users/{userId}:
+    delete:
+      summary: Delete user
+      description: Delete a user from the system
+      tags: [Cluster - Users]
+      security:
+        - ClusterAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User deleted successfully
+        '404':
+          description: User not found
+
+  /cluster/v1/agents:
+    post:
+      summary: Register agent
+      description: Register a new AI agent
+      tags: [Cluster - Agents]
+      security:
+        - ClusterAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id, name]
+              properties:
+                agent_id:
+                  type: string
+                  description: Unique agent identifier
+                name:
+                  type: string
+                  description: Agent's display name
+                permission:
+                  type: string
+                  description: CRUD permissions (e.g., 'r', 'rw', 'crud')
+                  default: r
+                description:
+                  type: string
+                  description: Agent description
+                guest:
+                  type: boolean
+                  description: Whether agent is a guest
+                  default: false
+      responses:
+        '201':
+          description: Agent registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+
+    get:
+      summary: List agents
+      description: List all registered agents
+      tags: [Cluster - Agents]
+      security:
+        - ClusterAuth: []
+      parameters:
+        - name: permission
+          in: query
+          schema:
+            type: string
+        - name: guest
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Agent'
+
+  /cluster/v1/agents/{agentId}:
+    get:
+      summary: Get agent
+      description: Get agent details
+      tags: [Cluster - Agents]
+      security:
+        - ClusterAuth: []
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+
+    put:
+      summary: Update agent
+      description: Update agent properties
+      tags: [Cluster - Agents]
+      security:
+        - ClusterAuth: []
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                permission:
+                  type: string
+                description:
+                  type: string
+                guest:
+                  type: boolean
+      responses:
+        '200':
+          description: Agent updated successfully
+
+    delete:
+      summary: Delete agent
+      description: Delete an agent
+      tags: [Cluster - Agents]
+      security:
+        - ClusterAuth: []
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent deleted successfully
+
+  /cluster/v1/sessions:
+    post:
+      summary: Create session
+      description: Create a new conversation session
+      tags: [Cluster - Sessions]
+      security:
+        - ClusterAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id, user_id, session_type_id]
+              properties:
+                session_id:
+                  type: string
+                user_id:
+                  type: string
+                session_type_id:
+                  type: string
+                  default: default
+                session_name:
+                  type: string
+      responses:
+        '201':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+  /cluster/v1/sessions/{sessionId}:
+    delete:
+      summary: Delete session
+      description: Delete a conversation session
+      tags: [Cluster - Sessions]
+      security:
+        - ClusterAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session deleted successfully
+
+  # Session Operations (Agent API)
+  /sessions/v1/{sessionId}/memories:
+    get:
+      summary: Get memories
+      description: Retrieve memories for a session
+      tags: [Sessions - Memory]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: agent_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: last_n
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: min_rating
+          in: query
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Session memories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Memory'
+
+    post:
+      summary: Add memory
+      description: Add new memory to session
+      tags: [Sessions - Memory]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: agent_id
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Message'
+                metadata:
+                  type: object
+      responses:
+        '201':
+          description: Memory added successfully
+
+  /sessions/v1/{sessionId}/knowledge:
+    get:
+      summary: Search knowledge
+      description: Search knowledge in session context
+      tags: [Sessions - Knowledge]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: agent_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Knowledge search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSearchResult'
+
+    post:
+      summary: Add knowledge
+      description: Add knowledge to session
+      tags: [Sessions - Knowledge]
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: agent_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Message'
+      responses:
+        '201':
+          description: Knowledge added successfully
+
+components:
+  securitySchemes:
+    ClusterAuth:
+      type: http
+      scheme: bearer
+      description: Cluster API key for developer operations
+
+  schemas:
+    User:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        permission:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        guest:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+        user_id:
+          type: string
+        session_name:
+          type: string
+        session_type_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      required: [role_type, content]
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        role:
+          type: string
+        role_type:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Memory:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        metadata:
+          type: object
+        agent_id:
+          type: string
+        session_id:
+          type: string
+
+    KnowledgeSearchResult:
+      type: object
+      properties:
+        session_id:
+          type: string
+        query:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        facts:
+          type: array
+          items:
+            type: object
+        total_count:
+          type: integer
+
+tags:
+  - name: Health
+    description: Health check operations
+  - name: Cluster - Users
+    description: User management (cluster level)
+  - name: Cluster - Agents
+    description: Agent management (cluster level)
+  - name: Cluster - Sessions
+    description: Session management (cluster level)
+  - name: Sessions - Memory
+    description: Memory operations (session level)
+  - name: Sessions - Knowledge
+    description: Knowledge operations (session level) 
