@@ -73,7 +73,7 @@ pip install -e .
 **Important**: Make sure your Eion server is running first (see Prerequisites above).
 
 ```python
-from eion_sdk import EionClient
+from eiondb import EionClient
 
 # Initialize client - use the same API key you set in your server config
 client = EionClient(

@@ -4,18 +4,29 @@ Basic usage example for Eion Python SDK
 
 This example demonstrates how to use the Eion SDK for cluster management
 and agent coordination.
+
+IMPORTANT: Make sure your Eion server is running first!
+
+Quick setup with Docker:
+    docker-compose up -d
+
+Or see: https://pypi.org/project/eiondb/ for full setup instructions.
 """
 
 import os
-from eion_sdk import EionClient, EionError
+from eiondb import EionClient, EionError
 
 def main():
     """Main example function"""
     
-    # Initialize client
+    print("🚀 Eion Python SDK - Basic Usage Example")
+    print("=" * 50)
+    
+    # Initialize client with clear example API key
+    # NOTE: Use the SAME key you set in your server's CLUSTER_API_KEY
     client = EionClient(
         base_url="http://localhost:8080",
-        cluster_api_key=os.getenv("EION_CLUSTER_API_KEY", "eion_cluster_your_key_here")
+        cluster_api_key=os.getenv("EION_CLUSTER_API_KEY", "my-secret-api-key-123")
     )
     
     try:
@@ -32,22 +43,21 @@ def main():
         )
         print(f"   Created user: {user.get('user_id')}")
         
-        # Register an agent
+        # Register an agent with correct permissions
         print("\n🤖 Registering agent...")
         agent = client.register_agent(
             agent_id="assistant_001",
             name="Demo Assistant",
-            permission="rw",
-            description="A demo assistant agent"
+            permission="crud",  # Use 'crud', 'cr', or 'r' (not 'rw')
+            description="A demo assistant agent with full permissions"
         )
-        print(f"   Registered agent: {agent.get('id')} with permission: {agent.get('permission')}")
+        print(f"   Registered agent: {agent.get('agent_id')} with permission: {agent.get('permission')}")
         
         # Create a session
         print("\n💬 Creating session...")
         session = client.create_session(
             session_id="demo_session_001",
             user_id="demo_user_001",
-            session_type_id="default",
             session_name="Demo Conversation"
         )
         print(f"   Created session: {session.get('session_id')}")
@@ -57,7 +67,7 @@ def main():
         agents = client.list_agents()
         print(f"   Found {len(agents)} agents:")
         for agent in agents:
-            print(f"     - {agent.get('id')}: {agent.get('name')} ({agent.get('permission')})")
+            print(f"     - {agent.get('agent_id')}: {agent.get('name')} ({agent.get('permission')})")
         
         # Monitor agent (if you have time range data)
         print("\n📊 Getting agent analytics...")
@@ -83,10 +93,16 @@ def main():
         print(f"\n❌ Eion API Error: {e.message}")
         if e.status_code:
             print(f"   Status Code: {e.status_code}")
+        if e.status_code == 403:
+            print("   💡 Hint: Make sure your cluster_api_key matches your server configuration")
         if e.response_data.get("hint"):
             print(f"   Hint: {e.response_data['hint']}")
     except Exception as e:
         print(f"\n💥 Unexpected Error: {e}")
+        print("   💡 Make sure your Eion server is running: docker-compose up -d")
 
 if __name__ == "__main__":
+    print("📦 Install: pip install eiondb")
+    print("🔧 Setup:   https://pypi.org/project/eiondb/")
+    print()
     main() 

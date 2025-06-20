@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="eiondb",
-    version="0.1.1",
+    version="0.1.2",
     description="Python SDK for Eion - Shared memory storage for AI agent systems",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
