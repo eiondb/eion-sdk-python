@@ -12,7 +12,10 @@ from .exceptions import (
     EionAuthenticationError,
     EionValidationError,
     EionNotFoundError,
-    EionServerError
+    EionServerError,
+    EionConnectionError,
+    EionTimeoutError,
+    EionSetupError
 )
 
 __all__ = [
@@ -21,5 +24,8 @@ __all__ = [
     "EionAuthenticationError", 
     "EionValidationError",
     "EionNotFoundError",
-    "EionServerError"
+    "EionServerError",
+    "EionConnectionError",
+    "EionTimeoutError",
+    "EionSetupError"
 ] 

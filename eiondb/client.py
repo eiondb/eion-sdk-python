@@ -69,15 +69,11 @@ class EionClient:
         self.cluster_api_key = (
             cluster_api_key or
             os.getenv("EION_CLUSTER_API_KEY") or
-            config.get("cluster_api_key")
+            config.get("cluster_api_key") or
+            config.get("auth", {}).get("cluster_api_key")
         )
 
-        if not self.cluster_api_key:
-            raise EionError("cluster_api_key is required. Provide it via parameter, EION_CLUSTER_API_KEY env var, or config file.")
-
-        self.timeout = timeout
-        
-        # Setup HTTP session with retries
+        # Set up requests session with retries
         self.session = requests.Session()
         
         retry_strategy = Retry(
@@ -90,6 +86,72 @@ class EionClient:
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
+        
+        self.timeout = timeout
+
+    # ==========================================
+    # HTTP CLIENT METHODS
+    # ==========================================
+
+    def _make_request(
+        self,
+        method: str,
+        endpoint: str,
+        json_data: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """Make an HTTP request to the Eion server"""
+        
+        # Prepare headers
+        request_headers = {"Content-Type": "application/json"}
+        if self.cluster_api_key:
+            request_headers["Authorization"] = f"Bearer {self.cluster_api_key}"
+        if headers:
+            request_headers.update(headers)
+
+        # Build URL
+        url = f"{self.base_url}{endpoint}"
+
+        try:
+            response = self.session.request(
+                method=method,
+                url=url,
+                json=json_data,
+                params=params,
+                headers=request_headers,
+                timeout=self.timeout
+            )
+
+            # Handle different response status codes
+            if response.status_code == 401:
+                raise EionAuthenticationError("Authentication failed - check your cluster API key")
+            elif response.status_code == 400:
+                error_detail = response.json().get("error", "Bad request") if response.content else "Bad request"
+                raise EionValidationError(f"Validation error: {error_detail}")
+            elif response.status_code == 404:
+                error_detail = response.json().get("error", "Resource not found") if response.content else "Resource not found"
+                raise EionNotFoundError(f"Not found: {error_detail}")
+            elif response.status_code >= 500:
+                error_detail = response.json().get("error", "Server error") if response.content else "Server error"
+                raise EionServerError(f"Server error: {error_detail}")
+            elif not response.ok:
+                error_detail = response.json().get("error", f"HTTP {response.status_code}") if response.content else f"HTTP {response.status_code}"
+                raise EionError(f"Request failed: {error_detail}")
+
+            # Return JSON response
+            return response.json() if response.content else {}
+
+        except requests.exceptions.Timeout:
+            raise EionTimeoutError(f"Request timed out after {self.timeout} seconds")
+        except requests.exceptions.ConnectionError:
+            raise EionConnectionError(f"Failed to connect to Eion server at {self.base_url}")
+        except requests.exceptions.RequestException as e:
+            raise EionError(f"Request failed: {e}")
+
+    # ==========================================
+    # CLUSTER MANAGEMENT METHODS  
+    # ==========================================
 
     def _get_headers(self) -> Dict[str, str]:
         """Get headers for cluster API requests."""
@@ -140,12 +202,6 @@ class EionClient:
                 status_code=response.status_code,
                 response_data=data
             )
-        elif response.status_code >= 500:
-            raise EionServerError(
-                data.get("error", "Server error"), 
-                status_code=response.status_code,
-                response_data=data
-            )
         else:
             raise EionError(
                 f"Unexpected status code: {response.status_code}",
@@ -181,10 +237,20 @@ class EionClient:
     def health_check(self) -> Dict[str, Any]:
         """Check Eion server health."""
         try:
-            response = self.session.get(f"{self.base_url}/health", timeout=self.timeout)
+            # Health endpoint doesn't require authentication
+            response = requests.get(f"{self.base_url}/health", timeout=self.timeout)
+            response.raise_for_status()
             return response.json()
         except Exception as e:
             raise EionConnectionError(f"Health check failed: {e}")
+
+    def server_health(self) -> bool:
+        """Check if Eion server is running and healthy."""
+        try:
+            health = self.health_check()
+            return health.get("status") == "healthy"
+        except Exception:
+            return False
 
     # User Management
     def create_user(self, user_id: str, name: Optional[str] = None) -> Dict[str, Any]:

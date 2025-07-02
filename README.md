@@ -6,8 +6,8 @@ Python SDK for Eion - Shared memory storage and collaborative intelligence for A
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Authentication](#authentication)
-- [Core Concepts](#core-concepts)
+- [Cluster Management](#cluster-management)
+- [Agent Memory Operations](#agent-memory-operations)
 - [API Reference](#api-reference)
 - [Troubleshooting](#troubleshooting)
 - [Configuration](#configuration)
@@ -70,113 +70,59 @@ pip install -e .
 
 ## Quick Start
 
-**Important**: Make sure your Eion server is running first (see Prerequisites above).
+### 1. Setup Eion Server (One-time)
 
 ```python
 from eiondb import EionClient
 
-# Initialize client - use the same API key you set in your server config
-client = EionClient(
-    base_url="http://localhost:8080",
-    cluster_api_key="my-secret-api-key-123"
-)
-
-# Check server health (this will fail if the API key doesn't match)
-health = client.health_check()
-print(f"Server status: {health['status']}")
-
-# Create a user
-user = client.create_user(
-    user_id="demo_user",
-    name="Demo User"
-)
-
-# Register an agent
-agent = client.register_agent(
-    agent_id="demo_agent",
-    name="Demo Agent",
-    permission="crud",
-    description="A demo agent for testing"
-)
-
-# Create a session
-session = client.create_session(
-    session_id="demo_session",
-    user_id="demo_user",
-    session_name="Demo Session"
-)
+# Setup server infrastructure (downloads ~3GB on first run)
+client = EionClient()
+client.setup()  # Downloads Docker images, Python packages, AI models
 ```
 
-## Authentication
-
-### Understanding the Cluster API Key
-
-The `cluster_api_key` is a **secret key that you define** when setting up your Eion server. It's not provided by a service - you choose it yourself for security.
-
-- **In your server**: Set `CLUSTER_API_KEY=my-secret-api-key-123` 
-- **In your SDK**: Use the same `cluster_api_key="my-secret-api-key-123"`
-
-### Authentication Methods
-
-The SDK supports multiple ways to provide your credentials:
-
-### 1. Direct Parameters
-```python
-client = EionClient(
-    base_url="http://localhost:8080",
-    cluster_api_key="my-secret-api-key-123"
-)
-```
-
-### 2. Environment Variables
-```bash
-export EION_BASE_URL="http://localhost:8080"
-export EION_CLUSTER_API_KEY="my-secret-api-key-123"
-```
+### 2. Run the Server
 
 ```python
-client = EionClient()  # Auto-loads from environment
+# Option A: Run in background (recommended for development)
+client.run(detached=True)
+
+# Option B: Run in foreground (blocks terminal)
+client.run()  # Press Ctrl+C to stop
 ```
 
-### 3. Configuration File
-Create `eion.yaml`:
-```yaml
-server:
-  base_url: "http://localhost:8080"
-auth:
-  cluster_api_key: "my-secret-api-key-123"
-```
+### 3. Use Cluster Management
 
 ```python
-client = EionClient(config_file="eion.yaml")
-```
+# Create users and agents
+client.create_user("user1", "John Doe")
+client.register_agent("agent1", "Assistant", permission="crud")
+client.create_session("session1", "user1")
 
-## Core Concepts
-
-### Users
-Users represent end-users of your application who will interact with agents.
-
-### Agents
-Agents are AI entities that can participate in sessions and perform operations based on their permissions.
-
-### Sessions
-Sessions are conversation contexts where users and agents interact.
-
-### Agent Groups
-Groups of agents that can be managed together and assigned to session types.
-
-### Session Types
-Templates that define which agent groups can participate in sessions.
-
-## API Reference
-
-### Health Check
-
-```python
 # Check server health
-health = client.health_check()
-# Returns: {"status": "healthy", "timestamp": "..."}
+if client.server_health():
+    print("✅ Server is ready!")
 ```
+
+### 4. Agent Memory Operations
+
+Agents use HTTP endpoints directly for memory operations:
+
+```bash
+# Agent stores memory
+curl -X POST "http://localhost:8080/sessions/v1/session1/memories?agent_id=agent1&user_id=user1" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "I like pizza"}]}'
+
+# Agent retrieves shared memory  
+curl "http://localhost:8080/sessions/v1/session1/memories?agent_id=agent1&user_id=user1&last_n=10"
+
+# Agent searches knowledge
+curl "http://localhost:8080/sessions/v1/session1/memories/search?agent_id=agent1&user_id=user1&query=pizza"
+```
+
+## Cluster Management
+
+The SDK provides cluster-level management for developers:
 
 ### User Management
 
@@ -197,29 +143,19 @@ client.delete_user("user123")
 # Register agent
 agent = client.register_agent(
     agent_id="agent123",
-    name="My Agent",
-    permission="crud",  # "r", "cr", "crud"
-    description="Agent description",  # Optional
-    guest=False  # Optional, default False
+    name="Assistant Agent",
+    permission="crud",  # c=create, r=read, u=update, d=delete
+    description="AI assistant for customer support"
 )
-
-# Get agent details
-agent = client.get_agent("agent123")
 
 # Update agent
-updated_agent = client.update_agent(
-    "agent123",
-    name="Updated Name",
-    description="New description"
-)
+client.update_agent("agent123", "permission", "r")
+
+# Delete agent  
+client.delete_agent("agent123")
 
 # List agents
 agents = client.list_agents()
-# With filters:
-agents = client.list_agents(permission="crud", guest=False)
-
-# Delete agent
-client.delete_agent("agent123")
 ```
 
 ### Session Management
@@ -229,127 +165,202 @@ client.delete_agent("agent123")
 session = client.create_session(
     session_id="session123",
     user_id="user123",
-    session_type_id="default",  # Optional
-    session_name="My Session"   # Optional
+    session_name="Support Chat"  # Optional
 )
 
 # Delete session
 client.delete_session("session123")
 ```
 
-### Agent Group Management
+### Agent Groups
 
 ```python
-# Register agent group
+# Create agent group
 group = client.register_agent_group(
-    agent_group_id="group123",
-    name="Customer Support Team",
-    agent_ids=["agent1", "agent2"],  # Optional
-    description="Support agents"     # Optional
+    group_id="support_team",
+    name="Support Team",
+    agent_ids=["agent1", "agent2"],
+    description="Customer support agents"
 )
 
-# List agent groups
-groups = client.list_agent_groups()
-
-# Get group details
-group = client.get_agent_group("group123")
-
-# Update agent group
-updated_group = client.update_agent_group(
-    "group123",
-    name="Updated Team Name",
-    agent_ids=["agent1", "agent2", "agent3"]
-)
-
-# Delete agent group
-client.delete_agent_group("group123")
+# Update group
+client.update_agent_group("support_team", "agent_ids", ["agent1", "agent2", "agent3"])
 ```
 
-### Session Type Management
+## Agent Memory Operations
 
-```python
-# Register session type
-session_type = client.register_session_type(
-    session_type_id="support_session",
-    name="Customer Support",
-    agent_group_ids=["support_team"],  # Optional
-    description="Customer support sessions",  # Optional
-    encryption="SHA256"  # Optional, default SHA256
-)
+**Important**: Agents use HTTP endpoints directly, not Python SDK methods.
 
-# List session types
-types = client.list_session_types()
-
-# Get session type details
-session_type = client.get_session_type("support_session")
-
-# Update session type
-updated_type = client.update_session_type(
-    "support_session",
-    name="Updated Support Type",
-    description="Updated description"
-)
-
-# Delete session type
-client.delete_session_type("support_session")
-```
-
-### Monitoring & Analytics
-
-```python
-# Monitor agent activity
-agent_stats = client.monitor_agent(
-    "agent123",
-    time_range={
-        "start_time": "2024-01-01T00:00:00Z",
-        "end_time": "2024-01-31T23:59:59Z"
-    }
-)
-
-# Monitor session activity
-session_stats = client.monitor_session("session123")
-```
-
-## Troubleshooting
-
-### Common Issues
-
-#### "Authentication failed" or 403 errors
-- **Problem**: Your `cluster_api_key` in the SDK doesn't match the `CLUSTER_API_KEY` in your server
-- **Solution**: Make sure both use the exact same value
-
-#### "Connection refused" or "Server not reachable"
-- **Problem**: Your Eion server isn't running
-- **Solution**: Run `docker-compose up -d` or check your server logs
-
-#### "Health check failed"
-- **Problem**: Server is running but not responding properly
-- **Solution**: Check server logs with `docker-compose logs eion-server`
-
-### Verifying Your Setup
+### Memory Storage
 
 ```bash
-# 1. Check if server is running
-curl http://localhost:8080/health
-
-# 2. Test with your API key
-curl -H "Authorization: Bearer my-secret-api-key-123" http://localhost:8080/health
+# Store conversation memory with automatic knowledge extraction
+curl -X POST "http://localhost:8080/sessions/v1/{session_id}/memories?agent_id={agent_id}&user_id={user_id}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "I want to order pizza"},
+      {"role": "assistant", "content": "What toppings would you like?"}
+    ]
+  }'
 ```
 
+### Memory Retrieval
+
+```bash
+# Get recent conversation history
+curl "http://localhost:8080/sessions/v1/{session_id}/memories?agent_id={agent_id}&user_id={user_id}&last_n=20"
+```
+
+### Knowledge Search
+
+```bash
+# Search shared knowledge across agents
+curl "http://localhost:8080/sessions/v1/{session_id}/memories/search?agent_id={agent_id}&user_id={user_id}&query=pizza+order"
+```
+
+### Multi-Agent Memory Sharing
+
+All agents in the same session share memory and knowledge:
+
+```python
+# Setup shared session
+client.create_session("shared_session", "user1")
+
+# Agent 1 stores memory → automatically shared
+# Agent 2 can retrieve Agent 1's memory
+# Agent 3 can search across all agents' knowledge
+```
+
+## API Reference
+
+### EionClient
+
+#### Server Management
+- `setup(force_reset=False)` - Setup server infrastructure
+- `run(detached=False)` - Run the server
+- `stop()` - Stop the server  
+- `reset()` - Reset to clean state
+- `server_health()` - Check server health
+
+#### Cluster Management
+- `create_user(user_id, name=None)`
+- `delete_user(user_id)`
+- `register_agent(agent_id, name, permission='r', description=None)`
+- `update_agent(agent_id, field, value)`
+- `delete_agent(agent_id)`
+- `list_agents(permission=None)`
+- `create_session(session_id, user_id, session_name=None)`
+- `delete_session(session_id)`
+- `register_agent_group(group_id, name, agent_ids=[], description=None)`
+
 ## Configuration
+
+### Default Configuration
+
+On first setup, `eion.yaml` is created with defaults:
+
+```yaml
+common:
+  http:
+    host: "0.0.0.0" 
+    port: 8080
+  postgres:
+    user: "eion"
+    password: "eion_pass"
+    host: "localhost"
+    port: 5432
+    database: "eion"
+  neo4j:
+    uri: "bolt://localhost:7687"
+    username: "neo4j"
+    password: "password"
+```
+
+### Custom Configuration
+
+Edit `eion.yaml` to customize:
+
+```yaml
+common:
+  http:
+    port: 8090  # Change server port
+  postgres:
+    password: "my_secure_password"  # Change database password
+```
 
 ### Environment Variables
 
 ```bash
+export EION_CLUSTER_API_KEY="your-secret-key"
 export EION_BASE_URL="http://localhost:8080"
-export EION_CLUSTER_API_KEY="my-secret-api-key-123"
 ```
 
-### Configuration File
+## Troubleshooting
+
+### Setup Issues
+
+**"Docker not found"**
+```bash
+# Install Docker Desktop
+# macOS: brew install --cask docker
+# Or download from https://docker.com
+```
+
+**"Port 8080 already in use"**
+```bash
+# Find process using port
+lsof -i :8080
+
+# Kill process or change port in eion.yaml
+```
+
+**"Insufficient disk space"**
+- Need at least 3GB free space for all dependencies
+
+### Runtime Issues
+
+**"Server not responding"**
+```python
+# Check if server is running
+client.server_health()
+
+# Restart server
+client.stop()
+client.run(detached=True)
+```
+
+**"Authentication failed"**
+- Make sure `cluster_api_key` is set correctly
+- Check `eion.yaml` configuration
+
+### Reset and Clean Start
 
 ```python
-client = EionClient(config_file="eion.yaml")
+# Complete reset
+client.reset()
+client.setup()
+client.run(detached=True)
 ```
+
+## System Requirements
+
+- **Python**: 3.7 or higher
+- **Docker**: Latest version with Docker Compose
+- **Disk Space**: 3GB free space
+- **Memory**: 4GB RAM recommended
+- **Ports**: 5432, 7474, 7687, 8080 available
+
+## Architecture
+
+Eion provides:
+
+- **🗄️ PostgreSQL + pgvector**: Message storage and vector search
+- **🕸️ Neo4j + APOC**: Knowledge graph with temporal reasoning  
+- **🤖 Real Embeddings**: `all-MiniLM-L6-v2` model (384 dimensions)
+- **🧠 Knowledge Extraction**: Automatic entity/relationship extraction
+- **⚡ Multi-Agent Memory**: Shared memory across agent sessions
+- **🔄 Conflict Resolution**: Automatic temporal conflict handling
 
 ## Features
 

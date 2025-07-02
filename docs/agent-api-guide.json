@@ -23,7 +23,8 @@
         "method": "POST",
         "endpoint": "/sessions/v1/{session_id}/memories",
         "parameters": {
-          "agent_id": "string (required)"
+          "agent_id": "string (required)",
+          "user_id": "string (required)"
         },
         "body": {
           "messages": [
@@ -36,7 +37,7 @@
           "metadata": "object (optional)"
         },
         "description": "Add new memory to session",
-        "example": "POST /sessions/v1/session_123/memories?agent_id=agent_001"
+        "example": "POST /sessions/v1/session_123/memories?agent_id=agent_001&user_id=user_123"
       },
       "search_memories": {
         "method": "GET",
